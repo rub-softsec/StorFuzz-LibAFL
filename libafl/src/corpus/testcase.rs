@@ -209,7 +209,7 @@ where
 
     /// Get `disabled`
     #[inline]
-    pub fn disabled(&mut self) -> bool {
+    pub fn disabled(&self) -> bool {
         self.disabled
     }
 
