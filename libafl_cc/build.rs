@@ -19,6 +19,9 @@ const LLVM_VERSION_MAX: u32 = 33;
 #[cfg(not(target_vendor = "apple"))]
 const LLVM_VERSION_MIN: u32 = 6;
 
+const ONE_MB: usize = 1 << 20;
+const SIXTY_FOUR_KB: usize = 65_536;
+
 /// Get the extension for a shared object
 fn dll_extension<'a>() -> &'a str {
     if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR") {
@@ -312,15 +315,15 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
     let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
-        .map_or(Ok(65_536), str::parse)
+        .map_or(Ok(SIXTY_FOUR_KB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
     let edges_map_size_max: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")
-        .map_or(Ok(2_621_440), str::parse)
+        .map_or(Ok(2 * ONE_MB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
     cxxflags.push(format!("-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
-        .map_or(Ok(65_536), str::parse)
+        .map_or(Ok(SIXTY_FOUR_KB), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
     cxxflags.push(format!("-DACCOUNTING_MAP_SIZE={acc_map_size}"));
 
