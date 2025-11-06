@@ -36,11 +36,11 @@ pub struct SchedulerMetadata {
     exec_time: Duration,
     /// Calibration cycles
     cycles: u64,
-    /// Size of the observer map
+    /// Sum of `set_entries_in_bitmap` (those that are `!= initial`) for all testcases in corpus
     bitmap_size: u64,
-    /// Sum of `log(bitmap_size`)
+    /// Sum of `log(set_entries_in_bitmap)` for all testcases in corpus
     bitmap_size_log: f64,
-    /// Number of filled map entries
+    /// Number of testcases contributing to the history bitmap
     bitmap_entries: u64,
     /// Queue cycles
     queue_cycles: u64,
@@ -98,13 +98,13 @@ impl SchedulerMetadata {
         self.cycles = val;
     }
 
-    /// The bitmap size
+    /// Sum of `set_entries_in_bitmap` for all testcases in corpus
     #[must_use]
     pub fn bitmap_size(&self) -> u64 {
         self.bitmap_size
     }
 
-    /// Sets the bitmap size
+    /// Sets the sum of `set_entries_in_bitmap` for all testcases in corpus
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
     }
@@ -120,13 +120,13 @@ impl SchedulerMetadata {
         self.bitmap_size_log = val;
     }
 
-    /// The number of filled map entries
+    /// The number of testcases contributing to the history bitmap
     #[must_use]
     pub fn bitmap_entries(&self) -> u64 {
         self.bitmap_entries
     }
 
-    /// Sets the number of filled map entries
+    /// Sets number of testcases contributing to the history bitmap
     pub fn set_bitmap_entries(&mut self, val: u64) {
         self.bitmap_entries = val;
     }
