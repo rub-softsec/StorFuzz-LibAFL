@@ -322,8 +322,10 @@ where
         };
 
         let avg_top_size = state.metadata::<TopRatedsMetadata>()?.map().len() as f64;
-        weight *= 1.0 + (tc_ref / avg_top_size);
-
+        // Ensure we don't panic
+        if avg_top_size.is_normal() {
+            weight *= 1.0 + (tc_ref / avg_top_size);
+        }
         if favored {
             weight *= 5.0;
         }
