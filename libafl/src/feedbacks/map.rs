@@ -8,6 +8,7 @@ use core::{
     marker::PhantomData,
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
+use log::error;
 
 #[rustversion::nightly]
 use libafl_bolts::AsSlice;
@@ -235,9 +236,42 @@ pub struct MapIndexesMetadata {
     pub list: Vec<usize>,
     /// A refcount used to know when we can remove this metadata
     pub tcref: isize,
+    /// The name of the map (useful for debugging purposes)
+    pub name: Cow<'static,str>
 }
 
 libafl_bolts::impl_serdeany!(MapIndexesMetadata);
+
+/// A testcase metadata holding indexes of a bitmap (the lower 8 bit of each index signify the bits set in the respective byte)
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+any(not(feature = "serdeany_autoreg"), miri),
+allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
+pub struct BitMapIndexesMetadata {
+    /// The list of indexes.
+    pub list: Vec<usize>,
+    /// The name of the map (useful for debugging purposes)
+    pub name: Cow<'static, str>
+}
+
+libafl_bolts::impl_serdeany!(BitMapIndexesMetadata);
+
+impl BitMapIndexesMetadata {
+    /// Creates a new [`BitMapIndexesMetadata`].
+    #[must_use]
+    pub fn new(list: Vec<usize>, name: Cow<'static, str>) -> Self {
+        Self { list, name }
+    }
+}
+
+impl Deref for BitMapIndexesMetadata {
+    type Target = [usize];
+    /// Convert to a slice
+    fn deref(&self) -> &[usize] {
+        &self.list
+    }
+}
 
 impl Deref for MapIndexesMetadata {
     type Target = [usize];
@@ -267,8 +301,8 @@ impl HasRefCnt for MapIndexesMetadata {
 impl MapIndexesMetadata {
     /// Creates a new [`struct@MapIndexesMetadata`].
     #[must_use]
-    pub fn new(list: Vec<usize>) -> Self {
-        Self { list, tcref: 0 }
+    pub fn new(list: Vec<usize>, name: Cow<'static, str>) -> Self {
+        Self { list, tcref: 0 , name }
     }
 }
 
@@ -325,6 +359,8 @@ where
     pub history_map: Vec<T>,
     /// Tells us how many non-initial entries there are in `history_map`
     pub num_covered_map_indexes: usize,
+    /// Should the map be read as individual bits or as bytes?
+    pub is_bitmap: bool
 }
 
 libafl_bolts::impl_serdeany!(
@@ -342,6 +378,7 @@ where
         Self {
             history_map: vec![T::default(); map_size],
             num_covered_map_indexes: 0,
+            is_bitmap: false
         }
     }
 
@@ -356,6 +393,7 @@ where
         Self {
             history_map,
             num_covered_map_indexes,
+            is_bitmap: false
         }
     }
 
@@ -398,6 +436,8 @@ pub struct MapFeedback<C, N, O, R, T> {
     last_result: Option<bool>,
     /// Phantom Data of Reducer
     phantom: PhantomData<(C, N, O, R, T)>,
+    /// For displaying info, is the map regarded as a bit or byte-map (default)
+    is_bitmap: bool,
 }
 
 impl<C, N, O, R, S, T> Feedback<S> for MapFeedback<C, N, O, R, T>
@@ -406,13 +446,16 @@ where
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T>,
     S: State + HasNamedMetadata,
-    T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
+    T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static + PrimInt,
     C: CanTrack + AsRef<O> + Observer<S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
         state.add_named_metadata(&self.name, MapFeedbackMetadata::<T>::default());
+        if self.is_bitmap{
+            state.named_metadata_mut::<MapFeedbackMetadata::<T>>(&self.name).unwrap().is_bitmap = true;
+        }
         Ok(())
     }
 
@@ -485,6 +528,20 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
+        // History map may be smaller, if is_interesting has not been called on the observer before
+        let len = observer.len();
+        if map_state.history_map.len() <  len {
+            map_state.history_map.resize(len, observer.initial())
+        }
+
+        if self.is_bitmap && !map_state.is_bitmap {
+            // We have restarted from history map. Recalculate num covered map indexes once
+            for el in map_state.history_map.as_slice() {
+                map_state.num_covered_map_indexes += el.count_ones() as usize;
+            }
+            map_state.is_bitmap = true;
+        }
+
         let history_map = &mut map_state.history_map;
         if C::INDICES {
             let mut indices = Vec::new();
@@ -496,14 +553,27 @@ where
                 .filter(|(_, value)| *value != initial)
             {
                 let val = R::reduce(history_map[i], value);
-                if history_map[i] == initial && val != initial {
-                    map_state.num_covered_map_indexes += 1;
+
+                if self.is_bitmap {
+                    map_state.num_covered_map_indexes += ((history_map[i] & value) ^ value).count_ones() as usize;
+                    // Hacky encoding of bits set in bitmap
+                    indices.push((i << 8 ) | value.to_usize().unwrap());
+                } else {
+                    if history_map[i] == initial && val != initial {
+                        map_state.num_covered_map_indexes += 1;
+                    }
+                    indices.push(i);
                 }
                 history_map[i] = val;
-                indices.push(i);
             }
-            let meta = MapIndexesMetadata::new(indices);
-            testcase.add_metadata(meta);
+
+            if self.is_bitmap{
+                let meta = BitMapIndexesMetadata::new(indices, self.name.clone());
+                testcase.add_metadata(meta);
+            } else {
+                let meta = MapIndexesMetadata::new(indices, self.name.clone());
+                testcase.add_metadata(meta);
+            };
         } else {
             for (i, value) in observer
                 .as_iter()
@@ -512,7 +582,9 @@ where
                 .filter(|(_, value)| *value != initial)
             {
                 let val = R::reduce(history_map[i], value);
-                if history_map[i] == initial && val != initial {
+                if self.is_bitmap {
+                    map_state.num_covered_map_indexes += ((history_map[i] & value) ^ value).count_ones() as usize;
+                } else if history_map[i] == initial && val != initial {
                     map_state.num_covered_map_indexes += 1;
                 }
                 history_map[i] = val;
@@ -520,20 +592,54 @@ where
         }
 
         debug_assert!(
-            history_map
-                .iter()
-                .fold(0, |acc, x| acc + usize::from(*x != initial))
-                == map_state.num_covered_map_indexes,
+            if self.is_bitmap {
+                history_map
+                    .iter()
+                    .fold(0, |acc, x| acc + (*x).count_ones()) as usize
+                    == map_state.num_covered_map_indexes
+            } else  {
+                history_map
+                    .iter()
+                    .fold(0, |acc, x| acc + usize::from(*x != initial))
+                    == map_state.num_covered_map_indexes
+            },
             "history_map had {} filled, but map_state.num_covered_map_indexes was {}",
-            history_map
-                .iter()
-                .fold(0, |acc, x| acc + usize::from(*x != initial)),
+            if self.is_bitmap {
+                history_map
+                    .iter()
+                    .fold(0, |acc, x| acc + (*x).count_ones()) as usize
+            } else  {
+                history_map
+                    .iter()
+                    .fold(0, |acc, x| acc + usize::from(*x != initial))
+            },
             map_state.num_covered_map_indexes,
         );
 
         // at this point you are executing this code, the testcase is always interesting
-        let covered = map_state.num_covered_map_indexes;
-        let len = history_map.len();
+        let mut covered = map_state.num_covered_map_indexes;
+        let len = if self.is_bitmap {
+            history_map.len() * size_of::<T>()
+        } else {
+            history_map.len()
+        };
+
+        if covered > len {
+            map_state.num_covered_map_indexes =
+                if self.is_bitmap {
+                    history_map
+                        .iter()
+                        .fold(0, |acc, x| acc + (*x).count_ones()) as usize
+                } else  {
+                    history_map
+                        .iter()
+                        .fold(0, |acc, x| acc + usize::from(*x != initial))
+                };
+            error!("We have counted more entries as covered than there are entries in the map: {}/{}. Counting again, we have {}/{}",
+                covered, len, map_state.num_covered_map_indexes, len);
+            covered = map_state.num_covered_map_indexes;
+        }
+
         // opt: if not tracking optimisations, we technically don't show the *current* history
         // map but the *last* history map; this is better than walking over and allocating
         // unnecessarily
@@ -710,7 +816,7 @@ fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
 
 impl<C, N, O, R, T> MapFeedback<C, N, O, R, T>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug + PrimInt,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
@@ -728,7 +834,14 @@ where
             #[cfg(feature = "track_hit_feedbacks")]
             last_result: None,
             phantom: PhantomData,
+            is_bitmap: false,
         }
+    }
+
+    /// For reporting, enable `bitmap` mode, which reports the number of bits set in the map,
+    /// rather than the number of entries set.
+    pub fn set_is_bitmap(&mut self, is_bitmap: bool) {
+        self.is_bitmap = is_bitmap;
     }
 
     /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
@@ -745,6 +858,7 @@ where
             #[cfg(feature = "track_hit_feedbacks")]
             last_result: None,
             phantom: PhantomData,
+            is_bitmap: false,
         }
     }
 
