@@ -318,7 +318,7 @@ where
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: Cow::from("stability"),
+                        name: Cow::from(format!("{}-stability", self.map_name)),
                         value: UserStats::new(
                             UserStatsValue::Ratio(
                                 (map_first_filled_count - unstable_entries) as u64,
@@ -334,7 +334,7 @@ where
             mgr.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: Cow::from("stability"),
+                    name: Cow::from(format!("{}-stability", self.map_name)),
                     value: UserStats::new(
                         UserStatsValue::Ratio(
                             map_first_filled_count as u64,
