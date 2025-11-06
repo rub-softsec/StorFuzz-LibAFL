@@ -450,6 +450,7 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+                testcase.set_parent_id_optional(*state.corpus().current());
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.feedback_mut()
                     .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
