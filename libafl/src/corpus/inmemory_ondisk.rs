@@ -3,7 +3,7 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
-use alloc::string::String;
+use alloc::string::{String , ToString};
 use core::cell::RefCell;
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -375,7 +375,25 @@ where
     fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error> {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name(Some(id))
+            let parent = testcase.parent_id();
+            let executions = testcase.executions();
+            let disabled = testcase.disabled();
+
+            let mut new_file_name = if disabled {
+                "disabled_".to_string()
+            } else {
+                "".to_string()
+            };
+
+            new_file_name = format!("{}id:{:0>5}",new_file_name, id.to_string());
+
+            if let Some(parent_id) = parent{
+                new_file_name = format!("{}_parent:{}",new_file_name, parent_id);
+            };
+
+            new_file_name = format!("{}_execs:{}", new_file_name, executions);
+
+            new_file_name
         });
 
         // New testcase, we need to save it.
