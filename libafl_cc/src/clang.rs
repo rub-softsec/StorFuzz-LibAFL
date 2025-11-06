@@ -41,6 +41,8 @@ pub enum LLVMPasses {
     CmpLogInstructions,
     /// Instrument caller for sancov coverage
     Ctx,
+    /// The StorFuzz pass
+    StorFuzzCoverage,
     /// Function logging
     FunctionLogging,
     /// Profiling
@@ -56,6 +58,8 @@ impl LLVMPasses {
         match self {
             LLVMPasses::CmpLogRtn => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
+            LLVMPasses::StorFuzzCoverage => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("storfuzz-coverage-pass.{}", dll_extension())),
             LLVMPasses::AutoTokens => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
             }
@@ -155,14 +159,6 @@ impl ToolWrapper for ClangWrapper {
 
         let mut linking = true;
         let mut shared = false;
-        // Detect stray -v calls from ./configure scripts.
-        if args.len() > 1 && args[1].as_ref() == "-v" {
-            if args.len() == 2 {
-                self.base_args.push(args[1].as_ref().into());
-                return Ok(self);
-            }
-            linking = false;
-        }
 
         let mut suppress_linking = 0;
         let mut i = 1;

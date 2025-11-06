@@ -119,6 +119,9 @@ pub mod coverage;
 #[cfg(feature = "coverage")]
 pub use coverage::*;
 
+pub mod storfuzz;
+pub use storfuzz::*;
+
 pub mod value_profile;
 pub use value_profile::*;
 

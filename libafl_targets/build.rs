@@ -4,6 +4,7 @@ use std::{env, fs::File, io::Write, path::Path};
 
 const ONE_MB: usize = 1 << 20;
 const SIXTY_FOUR_KB: usize = 65_536;
+const ONE_TWENTY_EIGHT_KB: usize = SIXTY_FOUR_KB * 2;
 
 #[rustversion::nightly]
 fn enable_nightly() {
@@ -32,6 +33,12 @@ fn main() {
     let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
         .map_or(Ok(SIXTY_FOUR_KB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    let storfuzz_map_size: usize = option_env!("STORFUZZ_MAP_SIZE")
+        .map_or(Ok(ONE_TWENTY_EIGHT_KB), str::parse)
+        .expect("Could not parse STORFUZZ_MAP_SIZE");
+    if !storfuzz_map_size.is_power_of_two(){
+        panic!("STORFUZZ_MAP_SIZE must be a power of two")
+    }
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
         .map_or(Ok(SIXTY_FOUR_KB), str::parse)
         .expect("Could not parse LIBAFL_CMP_MAP_SIZE");
@@ -56,6 +63,8 @@ fn main() {
         pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
         /// The real allocated size of the edges map
         pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
+        /// The size of the StorFuzz map
+        pub const STORFUZZ_MAP_SIZE: usize = {storfuzz_map_size};
         /// The size of the cmps map
         pub const CMP_MAP_SIZE: usize = {cmp_map_size};
         /// The width of the `CmpLog` map
@@ -163,6 +172,7 @@ fn main() {
                 "EDGES_MAP_SIZE_MAX",
                 Some(&*format!("{edges_map_size_max}")),
             )
+            .define("STORFUZZ_MAP_SIZE", Some(&*format!("{storfuzz_map_size}")))
             .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
             .define("DDG_MAP_SIZE", Some(&*format!("{ddg_map_size}")))
             .compile("coverage");
@@ -202,6 +212,13 @@ fn main() {
 
     #[cfg(any(feature = "forkserver", feature = "windows_asan"))]
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+
+    println!("cargo:rerun-if-changed=src/storfuzz.c");
+    
+    let mut builder = cc::Build::new();
+    builder.file(src_dir.join("storfuzz.c"));
+    builder.define("STORFUZZ_MAP_SIZE", Some(&*format!("{storfuzz_map_size}")));
+    builder.compile("storfuzz");
 
     #[cfg(feature = "forkserver")]
     {

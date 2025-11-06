@@ -1,0 +1,40 @@
+[package]
+name = "storfuzz_fuzzbench_in_process"
+version = "0.1.0"
+authors = ["Leon Weiß <leon.weiss@rub.de"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = "6.0"
+
+[dependencies]
+libafl = { path = "../../libafl/", features = ["track_hit_feedbacks"] }
+libafl_bolts = { path = "../../libafl_bolts/" }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
+libafl_cc = { path = "../../libafl_cc/" }
+clap = { version = "4.0", features = ["derive"] }
+mimalloc = { version = "*", default-features = false }
+storfuzz_constants = {path = "../storfuzz_constants/"}
+env_logger = "*"
+log = "*"
+
+[lib]
+name = "storfuzz_fuzzbench_in_process"
+crate-type = ["staticlib"]

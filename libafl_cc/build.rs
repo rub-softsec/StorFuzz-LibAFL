@@ -21,6 +21,7 @@ const LLVM_VERSION_MIN: u32 = 6;
 
 const ONE_MB: usize = 1 << 20;
 const SIXTY_FOUR_KB: usize = 65_536;
+const ONE_TWENTY_EIGHT_KB: usize = SIXTY_FOUR_KB * 2;
 
 /// Get the extension for a shared object
 fn dll_extension<'a>() -> &'a str {
@@ -314,6 +315,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
+    cxxflags.push(String::from("-g"));
+    cxxflags.push(String::from("-Wall"));
+
     let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
         .map_or(Ok(SIXTY_FOUR_KB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
@@ -321,6 +325,15 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         .map_or(Ok(2 * ONE_MB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
     cxxflags.push(format!("-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
+
+
+    let storfuzz_map_size: usize = option_env!("STORFUZZ_MAP_SIZE")
+        .map_or(Ok(ONE_TWENTY_EIGHT_KB), str::parse)
+        .expect("Could not parse STORFUZZ_MAP_SIZE");
+    cxxflags.push(format!("-DSTORFUZZ_MAP_SIZE={storfuzz_map_size}"));
+    if !storfuzz_map_size.is_power_of_two(){
+        panic!("STORFUZZ_MAP_SIZE must be a power of two")
+    }
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(SIXTY_FOUR_KB), str::parse)
@@ -353,6 +366,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
         /// The real allocated size of the edges map
         pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
+
+        /// The size of the edges map
+        pub const STORFUZZ_MAP_SIZE: usize = {storfuzz_map_size};
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
@@ -433,6 +449,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     for pass in [
         "function-logging.cc",
         "cmplog-routines-pass.cc",
+        "storfuzz-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
         "cmplog-instructions-pass.cc",
