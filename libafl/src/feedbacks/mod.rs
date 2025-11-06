@@ -4,7 +4,7 @@
 
 // TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::String};
 #[cfg(feature = "track_hit_feedbacks")]
 use alloc::vec::Vec;
 use core::{
@@ -30,6 +30,7 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    common::HasMetadata,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -920,6 +921,16 @@ where
     }
 }
 
+
+/// A testcase metadata holding the type of solution as a string
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SolutionType {
+    /// solution_type may for example be 'Crash' or 'Timeout'
+    pub solution_type: String,
+}
+
+libafl_bolts::impl_serdeany!(SolutionType);
+
 /// A [`CrashFeedback`] reports as interesting if the target crashed.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {
@@ -956,6 +967,24 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         self.last_result.ok_or(premature_last_result_err())
+    }
+
+    fn append_metadata<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _observers: &OT,
+        _testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+        where
+            OT: ObserversTuple<S>,
+    {
+        #[cfg(feature = "track_hit_feedbacks")]
+        if self.last_result.is_some_and(|res| {res == true}) {
+            _testcase.add_metadata(SolutionType{solution_type: "Crash".parse().unwrap() });
+        }
+
+        Ok(())
     }
 }
 
@@ -1026,6 +1055,24 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         self.last_result.ok_or(premature_last_result_err())
+    }
+
+    fn append_metadata<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _observers: &OT,
+        _testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+        where
+            OT: ObserversTuple<S>,
+    {
+        #[cfg(feature = "track_hit_feedbacks")]
+        if self.last_result.is_some_and(|res| {res == true}) {
+            _testcase.add_metadata(SolutionType{solution_type: "Timeout".parse().unwrap() });
+        }
+
+        Ok(())
     }
 }
 
