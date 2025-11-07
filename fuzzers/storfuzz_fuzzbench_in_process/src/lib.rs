@@ -295,8 +295,7 @@ fn fuzz(
     data_feedback.set_is_bitmap(true);
     let data_feedback = data_feedback;
 
-
-    // let calibration_feedback = AflMapFeedback::new(&calibration_observer);
+    // Filter unstable edges
     let calibration_stage = CalibrationStage::new(&edge_feedback);
 
     // Feedback to rate the interestingness of an input
@@ -372,7 +371,6 @@ fn fuzz(
         &edges_observer,
         StdWeightedScheduler::with_schedule(
             &mut state,
-            // &calibration_observer,
             &edges_observer,
             Some(PowerSchedule::FAST),
         )
