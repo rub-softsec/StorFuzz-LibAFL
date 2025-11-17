@@ -2,7 +2,7 @@
 
 This repository contains the fuzzer source code for the ICSE 2026 paper ["StorFuzz: Using Data Diversity to Overcome Fuzzing Plateaus"](https://doi.org/10.1145/3744916.3773179). It is based on LibAFL version 0.13.1
 
-The complete artifacts can be found at [rub-SoftSec/StorFuzz](https://github.com/rub-SoftSec/StorFuzz).
+The complete artifacts can be found at [rub-softsec/StorFuzz](https://github.com/rub-softsec/StorFuzz).
 
 The original README can be found at the bottom.
 
