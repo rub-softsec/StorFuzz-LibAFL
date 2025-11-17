@@ -10,7 +10,29 @@ The fuzzer implementation used for our experiments can be found in [./fuzzers/st
 
 The instrumentation pass is located in [./libafl_cc/src/storfuzz-coverage-pass.cc](./libafl_cc/src/storfuzz-coverage-pass.cc).
 
-## Requirements
+If you use StorFuzz in your work, please cite our paper:
+
+```biblatex
+@inproceedings{icse2026-storfuzz,
+  title     = {{StorFuzz: Using Data Diversity to Overcome Fuzzing Plateaus}},
+  author    = {Weiß, Leon and Holl, Tobias and Borgolte, Kevin},
+  booktitle = {Proceedings of the 48th IEEE/ACM International Conference on Software Engineering (ICSE)},
+  date      = {2026-04},
+  editor    = {Mezini, Mira and Zimmermann, Thomas},
+  location  = {Rio de Janeiro, Brazil},
+  publisher = {Association for Computing Machinery (ACM)/Institute of Electrical and Electronics Engineers (IEEE)},
+  doi       = {10.1145/3744916.3773179}
+}
+```
+<details>
+  <summary>How to <code>ß</code></summary>
+
+  LaTeX natively supports unicode and with that the `ß` in Weiß. You may need to use `\usepackage[utf8]{inputenc}`. You can also use `{\ss}` instead of `ß`.
+
+  The correct internationalization of `ß` is `ss`.
+</details>
+
+## Software Requirements
 
 LibAFL requires a fairly recent Rust version (1.90.0 is known to work). The StorFuzz pass is built to work with LLVM 17, but should also work with more recent versions up until LLVM 19.
 
