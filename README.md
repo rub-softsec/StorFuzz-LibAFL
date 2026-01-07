@@ -46,9 +46,9 @@ This could look like this:
 cd ./fuzzers/storfuzz_fuzzbench_in_process
 CFLAGS="" CXXFLAGS="" LIBAFL_EDGES_MAP_SIZE="" STORFUZZ_MAP_SIZE="" cargo build --release
 
-./target/release/libafl_cc --libafl <target_without_main.c>
+./target/release/libafl_cc --libafl <target_without_main.c> -o target_without_main
 
-./target --help
+./target_without_main --help
 ```
 
 If there is a `main` function, you might want to compile the fuzzer with `--features no_link_main` and link in the stub runtime provided as `stub_rt.c`.
@@ -60,12 +60,12 @@ CFLAGS="" CXXFLAGS="" LIBAFL_EDGES_MAP_SIZE="" STORFUZZ_MAP_SIZE="" cargo build 
 
 clang -c stub_rt.c && ar r stub_rt.a stub_rt.o
 
-./target/release/libafl_cc --libafl stub_rt.a <target_with_main.c>
+./target/release/libafl_cc --libafl stub_rt.a <target_with_main.c> -o target_with_main
 
-./target --help
+./target_with_main --help
 
 # For the original target behavior (e.g., if needed during build process)
-CONFIGURE=1 ./target
+CONFIGURE=1 ./target_with_main
 ```
 
 ---
