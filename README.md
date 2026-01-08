@@ -68,6 +68,37 @@ clang -c stub_rt.c && ar r stub_rt.a stub_rt.o
 CONFIGURE=1 ./target_with_main
 ```
 
+### Useful Environment Variables
+There are several environment variables that can be used to configure various aspects of StorFuzz and LibAFL.
+
+#### Fuzzer Compile Time
+- `LIBAFL_EDGES_MAP_SIZE_MAX`: The maximum size of the edges map used by the default LibAFL edge-coverage instrumentation in byte (1 edge = 1 byte)
+- `STORFUZZ_MAP_SIZE`: Size in bytes of the StorFuzz map in memory (the space occupied by one instrumented store depends on the value reduction that is chosen). Must be a power of 2
+
+#### Target Compile Time
+- `AFL_LLVM_DICT2FILE`: Use the LibAFL `AutoTokensPass` to write a fuzzing dictionary to file while compiling the target. If set, it must be set to an absolute path
+- `VALUE_REDUCTION_WIDTH`: Bitwidth of the reduced values, the used algorithms are explained at [rub-softsec/StorFuzz](https://github.com/rub-softsec/StorFuzz/blob/main/README.md#reduction-functions). Possible values are 4, 8 (default), 12, 16. `STORFUZZ_MAP_SIZE` must be large enough to accomodate at least 4096 entries
+- `MAX_STORES_PER_BB`: Maximum number of stores that are instrumented in a basic block. If there are more stores in the basic block, it is skipped entirely (default: 9)
+- `STORFUZZ_INSTRUMENT_MEM2MEM_COPY`: If set, instrument copies from memory to memory (by default these are not instrumented)
+- `STORFUZZ_VERBOSE`: If set, the instrumentation pass prints additional information
+- `CONFIGURE_MODE`: Flag to turn off StorFuzz instrumentation. Useful for configuring certain build systems that cannot cope with instrumented binaries during configuration
+- `LIBAFL_INSTRUMENT`: If set, the call to `libafl_cc`/`libafl_cxx` does not need to include `--libafl` to instrument the target
+
+#### Target Run Time
+- `LIBAFL_FUZZBENCH_DEBUG`: If NOT set (default), the fuzzer discards all output from the target to ensure clean fuzzing logs and improve fuzzing speed
+- `RUST_LOG`: Configure logging with [env_logger](https://docs.rs/env_logger/latest/env_logger/)
+- `CONFIGURE`: Flag to execute default `main` function instead of running the fuzzer. Useful for dealing with build systems that cannot cope with instrumented binaries. If there was no original `main` function, the target will exit with `42`
+
+## How-To Include StorFuzz's Data Coverage in your Fuzzer
+
+For LibAFL-based fuzzers it is fairly straightforward to integrate StorFuzz's data coverage:
+
+1. To instrument the target compile the target binary with `libafl_cc::LLVMPasses::StorFuzzCoverage`
+2. The coverage data is available via `libafl_targets::std_storfuzz_map_observer`, which creates a `libafl::observers::StdMapObserver`
+3. Feedback from the observer is created with `libafl::feedbacks::AflMapFeedback`, which has the policy `DifferentIsNovel` and combines the historic data with new data using an `OrReducer`. To display correct stats this feedback has to be interpreted as a bitmap using `set_is_bitmap(true)`
+4. The resulting feedback can then be incorporated in the overall fuzzer feedback
+5. The observer must be added to the executor to obtain correct results
+
 ---
 
 # LibAFL, the fuzzer library.
