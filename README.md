@@ -44,7 +44,9 @@ The fuzzer assumes that the function `LLVMFuzzerTestOneInput` is defined as a ha
 This could look like this:
 ```bash
 cd ./fuzzers/storfuzz_fuzzbench_in_process
-CFLAGS="" CXXFLAGS="" LIBAFL_EDGES_MAP_SIZE="" STORFUZZ_MAP_SIZE="" cargo build --release
+unset LIBAFL_EDGES_MAP_SIZE_MAX
+unset STORFUZZ_MAP_SIZE
+CFLAGS="" CXXFLAGS="" cargo build --release
 
 ./target/release/libafl_cc --libafl <target_without_main.c> -o target_without_main
 
@@ -56,7 +58,9 @@ This may however require changes to the build scripts.
 
 ```bash
 cd ./fuzzers/storfuzz_fuzzbench_in_process
-CFLAGS="" CXXFLAGS="" LIBAFL_EDGES_MAP_SIZE="" STORFUZZ_MAP_SIZE="" cargo build --release --features no_link_main
+unset LIBAFL_EDGES_MAP_SIZE_MAX
+unset STORFUZZ_MAP_SIZE
+CFLAGS="" CXXFLAGS="" cargo build --release --features no_link_main
 
 clang -c stub_rt.c && ar r stub_rt.a stub_rt.o
 
